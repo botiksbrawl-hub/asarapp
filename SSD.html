@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="kz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>ASAR - Ultimate Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        :root { --main: #4f46e5; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --border: #e2e8f0; --danger: #ef4444; }
+        [data-theme="dark"] { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --border: #334155; --main: #6366f1; }
+        
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        body, html { margin: 0; padding: 0; width: 100%; min-height: 100%; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); transition: 0.3s; overflow-x: hidden; }
+
+        #auth-screen { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        
+        header { background: var(--card); padding: 0 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1000; height: 60px; }
+        .logo { font-size: 22px; font-weight: 900; color: var(--main); }
+        .l-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; }
+        .l-btn.active { border-color: var(--main); color: var(--main); background: rgba(79, 70, 229, 0.1); }
+
+        .screen { max-width: 600px; margin: 0 auto; padding: 15px 15px 120px; min-height: 100vh; }
+        .post { background: var(--card); border-radius: 20px; padding: 16px; margin-bottom: 15px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.03); position: relative; }
+        .post-img { width: 100%; border-radius: 12px; margin-top: 10px; max-height: 350px; object-fit: cover; }
+        
+        input, textarea { width: 100%; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 14px; font-size: 16px; margin-bottom: 10px; display: block; }
+        .btn-main { background: var(--main); color: white; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; font-size: 16px; }
+        .btn-del { color: var(--danger); background: none; border: 1px solid var(--danger); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: var(--card); display: flex; justify-content: space-around; border-top: 1px solid var(--border); height: 70px; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); }
+        .nav-btn { background: none; border: none; color: var(--text); opacity: 0.4; font-size: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; }
+        .nav-btn.active { opacity: 1; color: var(--main); }
+        .nav-btn span { font-size: 24px; }
+
+        .fab { position: fixed; bottom: 85px; right: 20px; background: var(--main); color: white; width: 56px; height: 56px; border-radius: 28px; border: none; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4); font-size: 30px; z-index: 1100; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 5000; padding: 20px; backdrop-filter: blur(5px); }
+        .modal-content { background: var(--card); width: 100%; max-width: 400px; padding: 25px; border-radius: 24px; text-align: center; }
+
+        #chat-window { position: fixed; inset: 0; background: var(--bg); z-index: 6000; display: none; flex-direction: column; }
+        .chat-header { background: var(--card); padding: 15px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; font-weight: bold; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .m { padding: 10px 14px; border-radius: 18px; max-width: 80%; font-size: 15px; word-wrap: break-word; }
+        .m-my { align-self: flex-end; background: var(--main); color: white; border-bottom-right-radius: 4px; }
+        .m-ot { align-self: flex-start; background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body data-theme="light">
+
+<div id="auth-screen">
+    <div style="width:100%; max-width:320px; text-align:center;">
+        <h1 class="logo" style="font-size: 45px; margin-bottom: 5px;">ASAR</h1>
+        <p id="t-auth-sub" style="opacity:0.6; margin-bottom:30px;">Білім мен көмек мекені</p>
+        <input type="text" id="reg-name" placeholder="Атың кім?">
+        <input type="text" id="reg-school" placeholder="Мектебің">
+        <button class="btn-main" onclick="register()">Кіру</button>
+    </div>
+</div>
+
+<div id="app" class="hidden">
+    <header>
+        <div class="logo">ASAR</div>
+        <div style="display:flex; gap:6px;">
+            <button onclick="changeLang('kz')" id="l-kz" class="l-btn">KZ</button>
+            <button onclick="changeLang('ru')" id="l-ru" class="l-btn">RU</button>
+            <button onclick="changeLang('en')" id="l-en" class="l-btn">EN</button>
+            <button onclick="toggleTheme()" style="background:none; border:none; font-size:20px; cursor:pointer;">🌓</button>
+        </div>
+    </header>
+
+    <div id="screen-feed" class="screen"><div id="posts-container"></div></div>
+    <div id="screen-chats" class="screen hidden"><h2 id="t-chats-h">Хаттар</h2><div id="dialogs-list"></div></div>
+    <div id="screen-profile" class="screen hidden">
+        <div style="background:var(--card); padding:25px; border-radius:20px; text-align:center; border:1px solid var(--border); margin-bottom:20px;">
+            <div id="u-avatar" style="width:60px; height:60px; background:var(--main); color:white; border-radius:50%; margin:0 auto 10px; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:bold;"></div>
+            <h2 id="user-display-name" style="margin:0;"></h2>
+            <p id="user-display-school" style="opacity:0.6; margin:5px 0 15px;"></p>
+            <button onclick="logout()" id="t-logout" style="color:var(--danger); background:none; border:none; font-weight:bold; cursor:pointer;">Шығу</button>
+        </div>
+        <h3 id="t-my-posts">Менің сұрақтарым</h3>
+        <div id="my-posts-container"></div>
+    </div>
+
+    <button class="fab" id="fab-plus" onclick="openModal('post-modal')">+</button>
+
+    <nav class="bottom-nav">
+        <button class="nav-btn active" id="btn-feed" onclick="setScreen('screen-feed')"><span>🏠</span><b id="n-feed">Сұрақтар</b></button>
+        <button class="nav-btn" id="btn-chats" onclick="setScreen('screen-chats')"><span>💬</span><b id="n-chats">Хаттар</b></button>
+        <button class="nav-btn" id="btn-profile" onclick="setScreen('screen-profile')"><span>👤</span><b id="n-prof">Парақша</b></button>
+    </nav>
+</div>
+
+<div id="post-modal" class="modal">
+    <div class="modal-content">
+        <h3 id="t-new-post">Жаңа сұрақ</h3>
+        <textarea id="post-text" placeholder="..." rows="4"></textarea>
+        <input type="file" id="post-file" accept="image/*" class="hidden" onchange="handleImage()">
+        <label for="post-file" id="t-add-photo" style="display:block; margin:15px 0; color:var(--main); text-align:center; padding:15px; border:2px dashed var(--main); border-radius:12px; cursor:pointer;">📎 Сурет қосу</label>
+        <div id="img-preview-container"></div>
+        <button class="btn-main" id="btn-publish" onclick="submitPost()">Жариялау</button>
+        <button onclick="closeModal('post-modal')" id="t-cancel" style="width:100%; background:none; border:none; color:gray; margin-top:15px; cursor:pointer;">Артқа</button>
+    </div>
+</div>
+
+<div id="confirm-modal" class="modal">
+    <div class="modal-content">
+        <h3 id="confirm-title">Өшіруді растайсыз ба?</h3>
+        <button id="confirm-yes" class="btn-main" style="background: var(--danger);">Иә, өшіру</button>
+        <button onclick="closeModal('confirm-modal')" class="btn-main" style="background: none; color: gray; margin-top: 10px;">Болдырмау</button>
+    </div>
+</div>
+
+<div id="chat-window">
+    <div class="chat-header">
+        <button onclick="closeChat()" style="background:none; border:none; font-size:24px; color:var(--main);">←</button>
+        <span id="chat-target-name">...</span>
+    </div>
+    <div id="chat-box" class="chat-messages"></div>
+    <div style="padding:15px; background:var(--card); display:flex; gap:10px; border-top:1px solid var(--border); padding-bottom: max(15px, env(safe-area-inset-bottom));">
+        <input type="text" id="chat-input" placeholder="..." style="margin:0; border-radius:25px;">
+        <button onclick="sendMessage()" class="btn-main" style="width:50px; height:50px; border-radius:50%; padding:0;">➤</button>
+    </div>
+</div>
+
+<script>
+    const S_URL = 'https://dmrimbfvyvnsllsdtidu.supabase.co';
+    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtcmltYmZ2eXZuc2xsc2R0aWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyOTMxMzAsImV4cCI6MjA4ODg2OTEzMH0.8hPXILhc-LEvZtTydte0KpBa6pPWVt5S1ltTJllOyUM';
+    const api = supabase.createClient(S_URL, S_KEY);
+
+    let user = JSON.parse(localStorage.getItem('asar_user'));
+    let lang = localStorage.getItem('asar_lang') || 'kz';
+    let currentPhoto = null, chatTarget = '';
+
+    const dict = {
+        kz: { feed:"Сұрақтар", chats:"Хаттар", prof:"Парақша", logout:"Шығу", new:"Жаңа сұрақ", pub:"Жариялау", cancel:"Артқа", photo:"📎 Сурет қосу", my:"Менің сұрақтарым", sub:"Білім мен көмек мекені", help:"Көмектесу", del:"Өшіру", confTitle: "Өшіруді растайсыз ба?", confBtn: "Иә, өшіру" },
+        ru: { feed:"Вопросы", chats:"Чаты", prof:"Профиль", logout:"Выйти", new:"Новый вопрос", pub:"Опубликовать", cancel:"Отмена", photo:"📎 Добавить фото", my:"Мои вопросы", sub:"Место знаний и помощи", help:"Помочь", del:"Удалить", confTitle: "Подтвердите удаление", confBtn: "Да, удалить" },
+        en: { feed:"Feed", chats:"Chats", prof:"Profile", logout:"Logout", new:"New Post", pub:"Post", cancel:"Back", photo:"📎 Add Photo", my:"My Posts", sub:"Place for help and knowledge", help:"Help", del:"Delete", confTitle: "Confirm Delete", confBtn: "Yes, Delete" }
+    };
+
+    function initTheme() { document.body.setAttribute('data-theme', localStorage.getItem('asar_theme') || 'light'); }
+    function toggleTheme() {
+        const next = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.body.setAttribute('data-theme', next);
+        localStorage.setItem('asar_theme', next);
+    }
+
+    function register() {
+        const n = document.getElementById('reg-name').value.trim();
+        const s = document.getElementById('reg-school').value.trim();
+        if(n && s) { localStorage.setItem('asar_user', JSON.stringify({name:n, school:s})); location.reload(); }
+    }
+    function logout() { localStorage.removeItem('asar_user'); location.reload(); }
+    function changeLang(l) { lang = l; localStorage.setItem('asar_lang', l); updateText(); }
+
+    function updateText() {
+        const d = dict[lang];
+        const mapping = { 'n-feed':'feed', 'n-chats':'chats', 'n-prof':'prof', 't-chats-h':'chats', 't-logout':'logout', 't-new-post':'new', 'btn-publish':'pub', 't-cancel':'cancel', 't-add-photo':'photo', 't-my-posts':'my', 't-auth-sub':'sub' };
+        for(let id in mapping) { const el = document.getElementById(id); if(el) el.innerText = d[mapping[id]]; }
+        document.querySelectorAll('.l-btn').forEach(b => b.classList.toggle('active', b.id === 'l-'+lang));
+        fetchPosts(); loadMyPosts(); loadDialogs();
+    }
+
+    function showConfirm(onYes) {
+        const modal = document.getElementById('confirm-modal');
+        const btn = document.getElementById('confirm-yes');
+        document.getElementById('confirm-title').innerText = dict[lang].confTitle;
+        btn.innerText = dict[lang].confBtn;
+        modal.style.display = 'flex';
+        btn.onclick = () => { onYes(); closeModal('confirm-modal'); };
+    }
+
+    function setScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + id.split('-')[1]).classList.add('active');
+        document.getElementById('fab-plus').classList.toggle('hidden', id !== 'screen-feed');
+        if(id === 'screen-chats') loadDialogs();
+        if(id === 'screen-profile') loadMyPosts();
+    }
+
+    function subscribe() {
+        api.channel('asar-realtime').on('postgres_changes', {event:'*', schema:'public', table:'posts'}, () => { fetchPosts(); loadMyPosts(); }).subscribe();
+        api.channel('asar-chats').on('postgres_changes', {event:'*', schema:'public', table:'direct_messages'}, (p) => {
+            loadDialogs();
+            if(chatTarget && (p.new.sender === chatTarget || p.new.receiver === chatTarget)) syncChat();
+        }).subscribe();
+    }
+
+    async function submitPost() {
+        const txt = document.getElementById('post-text').value.trim(); if(!txt) return;
+        let url = null;
+        if(currentPhoto) {
+            const name = Date.now() + '.jpg';
+            await api.storage.from('photos').upload(name, currentPhoto);
+            url = api.storage.from('photos').getPublicUrl(name).data.publicUrl;
+        }
+        await api.from('posts').insert([{author:user.name, school:user.school, text:txt, image_url:url}]);
+        closeModal('post-modal');
+    }
+
+    async function deletePost(id) {
+        showConfirm(async () => {
+            await api.from('posts').delete().eq('id', id);
+            fetchPosts(); loadMyPosts();
+        });
+    }
+
+    async function fetchPosts() {
+        let { data } = await api.from('posts').select('*').order('created_at', {ascending:false});
+        renderPosts(data, 'posts-container', false);
+    }
+
+    async function loadMyPosts() {
+        let { data } = await api.from('posts').select('*').eq('author', user.name).order('created_at', {ascending:false});
+        renderPosts(data, 'my-posts-container', true);
+    }
+
+    function renderPosts(data, containerId, isMyScreen) {
+        const c = document.getElementById(containerId); if(!c) return;
+        c.innerHTML = '';
+        data?.forEach(p => {
+            const isAuthor = user && p.author === user.name;
+            const delBtn = (isAuthor && isMyScreen) ? `<button class="btn-del" onclick="deletePost(${p.id})">${dict[lang].del}</button>` : '';
+            const helpBtn = (!isAuthor) ? `<button class="btn-main" style="margin-top:10px; height:40px; font-size:14px;" onclick="openChat('${p.author}')">${dict[lang].help}</button>` : '';
+            c.innerHTML += `<div class="post"><b>${p.author}</b> <span style="float:right; font-size:11px; opacity:0.6;">${p.school}</span><p style="margin-top:10px;">${p.text}</p>${p.image_url ? `<img src="${p.image_url}" class="post-img">` : ''}<div style="display:flex; gap:10px;">${helpBtn}${delBtn}</div></div>`;
+        });
+    }
+
+    function crypt(t, k) { return CryptoJS.AES.encrypt(t, k).toString(); }
+    function decrypt(t, k) { try { return CryptoJS.AES.decrypt(t, k).toString(CryptoJS.enc.Utf8) || "..."; } catch { return "???"; } }
+
+    async function openChat(name) {
+        chatTarget = name; document.getElementById('chat-target-name').innerText = name;
+        document.getElementById('chat-window').style.display = 'flex';
+        let temp = JSON.parse(localStorage.getItem('temp_chats')||'[]'); if(!temp.includes(name)) { temp.push(name); localStorage.setItem('temp_chats', JSON.stringify(temp)); }
+        syncChat(); loadDialogs();
+    }
+    function closeChat() { document.getElementById('chat-window').style.display = 'none'; chatTarget = ''; }
+
+    async function syncChat() {
+        if(!chatTarget) return;
+        const cid = [user.name, chatTarget].sort().join('_X_');
+        const { data } = await api.from('direct_messages').select('*').eq('chat_id', cid).order('created_at', {ascending:true});
+        const box = document.getElementById('chat-box'); box.innerHTML = '';
+        data?.forEach(m => { box.innerHTML += `<div class="m ${m.sender === user.name ? 'm-my' : 'm-ot'}">${decrypt(m.text, cid)}</div>`; });
+        box.scrollTop = box.scrollHeight;
+    }
+
+    async function sendMessage() {
+        const inp = document.getElementById('chat-input'); const txt = inp.value.trim(); if(!txt || !chatTarget) return; inp.value = '';
+        const cid = [user.name, chatTarget].sort().join('_X_');
+        await api.from('direct_messages').insert([{sender:user.name, receiver:chatTarget, text:crypt(txt, cid), chat_id:cid}]);
+        syncChat();
+    }
+
+    async function deleteChat(name) {
+        showConfirm(async () => {
+            const cid = [user.name, name].sort().join('_X_');
+            await api.from('direct_messages').delete().eq('chat_id', cid);
+            let temp = JSON.parse(localStorage.getItem('temp_chats')||'[]');
+            localStorage.setItem('temp_chats', JSON.stringify(temp.filter(n => n !== name)));
+            loadDialogs();
+        });
+    }
+
+    async function loadDialogs() {
+        if(!user) return;
+        const { data } = await api.from('direct_messages').select('sender, receiver').or(`sender.eq.${user.name},receiver.eq.${user.name}`);
+        const set = new Set();
+        data?.forEach(d => set.add(d.sender === user.name ? d.receiver : d.sender));
+        let temp = JSON.parse(localStorage.getItem('temp_chats')||'[]'); temp.forEach(n => set.add(n));
+        const list = document.getElementById('dialogs-list'); list.innerHTML = '';
+        set.forEach(u => {
+            if(u === user.name) return;
+            list.innerHTML += `<div class="post" style="display:flex; justify-content:space-between; align-items:center;"><div onclick="openChat('${u}')" style="flex:1; cursor:pointer;"><b>💬 ${u}</b></div><span onclick="deleteChat('${u}')" style="color:var(--danger); cursor:pointer;">🗑️</span></div>`;
+        });
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; if(id==='post-modal') { document.getElementById('img-preview-container').innerHTML = ''; currentPhoto = null; document.getElementById('post-text').value = ''; } }
+
+    function handleImage() {
+        const file = document.getElementById('post-file').files[0]; if(!file) return;
+        const reader = new FileReader(); reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image(); img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas'); const MAX_W = 800; const scale = MAX_W / img.width;
+                canvas.width = MAX_W; canvas.height = img.height * scale;
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob(blob => { currentPhoto = blob; }, 'image/jpeg', 0.8);
+                document.getElementById('img-preview-container').innerHTML = `<img src="${e.target.result}" style="width:100%; border-radius:12px; max-height:200px; object-fit:cover; margin-top:10px;">`;
+            }
+        }
+    }
+
+    initTheme();
+    if(user) {
+        document.getElementById('auth-screen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        document.getElementById('user-display-name').innerText = user.name;
+        document.getElementById('user-display-school').innerText = user.school;
+        document.getElementById('u-avatar').innerText = user.name[0].toUpperCase();
+        updateText(); subscribe();
+    }
+</script>
+</body>
+</html>
